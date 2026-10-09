@@ -17,7 +17,7 @@ For Codex:
 
 ```powershell
 codex plugin marketplace add zxcvbbq/x64dbg-MCP
-codex plugin add x64dbg-mcp@zxcvbbq
+codex plugin add x64dbg-mcp@x64dbg-mcp
 ```
 
 Download the matching adapter from the [Releases tab](https://github.com/zxcvbbq/x64dbg-MCP/releases) and copy it into the `plugins` folder next to the debugger executable:

@@ -1,15 +1,17 @@
 {
-  "name": "zxcvbbq",
+  "name": "x64dbg-mcp",
   "interface": {
-    "displayName": "x64dbg MCP Marketplace"
+    "displayName": "x64dbg MCP"
   },
   "plugins": [
     {
       "name": "x64dbg-mcp",
-      "source": {
-        "source": "local",
-        "path": "./"
-      }
+      "source": "./",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
     }
   ]
 }
