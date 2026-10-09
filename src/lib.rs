@@ -332,7 +332,8 @@ mod plugin {
                 let result = if !(0..=4096).contains(&count) || map.count != count {
                     Err("x64dbg returned an invalid or oversized breakpoint list".to_owned())
                 } else {
-                    let breakpoints = unsafe { std::slice::from_raw_parts(map.bp, count as usize) }
+                    let shown_count = (count as usize).min(256);
+                    let breakpoints = unsafe { std::slice::from_raw_parts(map.bp, shown_count) }
                         .iter()
                         .map(|bp| {
                             json!({
@@ -346,7 +347,9 @@ mod plugin {
                             })
                         })
                         .collect::<Vec<_>>();
-                    Ok(json!({ "breakpoints": breakpoints }))
+                    Ok(
+                        json!({ "breakpoints": breakpoints, "truncated": count as usize > shown_count }),
+                    )
                 };
                 unsafe { (api.bridge_free)(map.bp.cast()) };
                 result
