@@ -256,7 +256,7 @@ mod plugin {
                 if !(1..=4096).contains(&length) {
                     return Err("length must be between 1 and 4096".to_owned());
                 }
-                let mut bytes = vec![0; length as usize];
+                let mut bytes = vec![0u8; length as usize];
                 if !unsafe { (api.mem_read)(address, bytes.as_mut_ptr().cast(), bytes.len()) } {
                     return Err(format!("x64dbg could not read memory at 0x{address:X}"));
                 }
