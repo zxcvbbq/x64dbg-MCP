@@ -1,6 +1,6 @@
 {
   "name": "x64dbg-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP tools for inspecting and controlling a local x64dbg session.",
   "author": {
     "name": "zxcvbbq"
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "x64dbg MCP",
     "shortDescription": "Connect Codex to a running x64dbg session.",
-    "longDescription": "Evaluate expressions, disassemble code, read target memory, inspect debugger state, and execute x64dbg commands.",
+    "longDescription": "Evaluate expressions, inspect registers and stack, manage breakpoints, read and write target memory, and execute x64dbg commands.",
     "developerName": "zxcvbbq",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "MCP"]

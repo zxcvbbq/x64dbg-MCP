@@ -1,8 +1,16 @@
 {
   "mcpServers": {
     "x64dbg": {
-      "command": "cargo",
-      "args": ["run", "--quiet", "--release", "--locked"],
+      "command": "powershell.exe",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$ErrorActionPreference='Stop'; $cache=Join-Path $env:LOCALAPPDATA 'x64dbg-MCP\\0.2.0'; $exe=Join-Path $cache 'x64dbg-mcp.exe'; if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { New-Item -ItemType Directory -Force -Path $cache | Out-Null; $download=Join-Path $cache 'x64dbg-mcp.exe.download'; $downloadHash=Join-Path $cache 'x64dbg-mcp.exe.download.sha256'; Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/zxcvbbq/x64dbg-MCP/releases/download/v0.2.0/x64dbg-mcp-x86_64-pc-windows-msvc.exe' -OutFile $download; Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/zxcvbbq/x64dbg-MCP/releases/download/v0.2.0/x64dbg-mcp-x86_64-pc-windows-msvc.exe.sha256' -OutFile $downloadHash; $expected=((Get-Content -LiteralPath $downloadHash -Raw).Trim().Split(' ')[0]).ToLowerInvariant(); $actual=(Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash.ToLowerInvariant(); if ($actual -ne $expected) { Remove-Item -LiteralPath $download,$downloadHash -Force; throw 'x64dbg MCP checksum verification failed' }; Move-Item -LiteralPath $download -Destination $exe -Force; Move-Item -LiteralPath $downloadHash -Destination (Join-Path $cache 'x64dbg-mcp.exe.sha256') -Force }; & $exe"
+      ],
       "cwd": ".",
       "env": {}
     }

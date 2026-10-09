@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: i686-pc-windows-msvc
+      - name: Build x64 MCP and adapter
+        run: cargo build --release --locked --target x86_64-pc-windows-msvc
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+      - name: Build x32 adapter
+        run: cargo build --release --locked --lib --target i686-pc-windows-msvc
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+      - name: Prepare release assets
+        shell: pwsh
+        run: |
+          $exe = 'x64dbg-mcp-x86_64-pc-windows-msvc.exe'
+          $x64 = 'x64dbg_mcp-x64.dp64'
+          $x86 = 'x64dbg_mcp-x86.dp32'
+          Copy-Item 'target\x86_64-pc-windows-msvc\release\x64dbg-mcp.exe' $exe
+          Copy-Item 'target\x86_64-pc-windows-msvc\release\x64dbg_plugin.dll' $x64
+          Copy-Item 'target\i686-pc-windows-msvc\release\x64dbg_plugin.dll' $x86
+          foreach ($asset in @($exe, $x64, $x86)) {
+            $hash = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $asset" | Set-Content -LiteralPath "$asset.sha256" -NoNewline
+          }
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            'x64dbg-mcp-x86_64-pc-windows-msvc.exe' `
+            'x64dbg-mcp-x86_64-pc-windows-msvc.exe.sha256' `
+            'x64dbg_mcp-x64.dp64' `
+            'x64dbg_mcp-x64.dp64.sha256' `
+            'x64dbg_mcp-x86.dp32' `
+            'x64dbg_mcp-x86.dp32.sha256' `
+            --title "${{ github.ref_name }}" `
+            --generate-notes
