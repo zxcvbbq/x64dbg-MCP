@@ -22,8 +22,8 @@ codex plugin add x64dbg-mcp@zxcvbbq
 
 Download the matching adapter from the [Releases tab](https://github.com/zxcvbbq/x64dbg-MCP/releases) and copy it into the `plugins` folder next to the debugger executable:
 
-- x64dbg: `x64dbg_mcp-x64.dp64`
-- x32dbg: `x64dbg_mcp-x86.dp32`
+- x64dbg: [x64dbg_mcp-x64.dp64](https://github.com/zxcvbbq/x64dbg-MCP/releases/latest/download/x64dbg_mcp-x64.dp64)
+- x32dbg: [x64dbg_mcp-x86.dp32](https://github.com/zxcvbbq/x64dbg-MCP/releases/latest/download/x64dbg_mcp-x86.dp32)
 
 Restart x64dbg after copying the adapter, then restart Claude Code or Codex. When the MCP plugin starts, it downloads the versioned x64 server executable to `%LOCALAPPDATA%\x64dbg-MCP` and verifies its SHA-256 checksum. No separate installer or Rust toolchain is needed.
 
