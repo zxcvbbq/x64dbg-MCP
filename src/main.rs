@@ -34,6 +34,26 @@ struct ReadMemoryParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct AddressParams {
+    /// Address or x64dbg expression.
+    address: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct StackParams {
+    /// Number of pointer-sized stack values to read, from 1 through 64 (default 16).
+    count: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct WriteMemoryParams {
+    /// Starting address or x64dbg address expression.
+    address: String,
+    /// Bytes to write, from 1 through 4096 values in the range 0 through 255.
+    bytes: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct ExecuteCommandParams {
     /// An x64dbg command. Commands can change debugger or target state.
     command: String,
@@ -110,6 +130,53 @@ impl X64Dbg {
         plugin_call(
             "read_memory",
             json!({ "address": params.address, "length": params.length }),
+        )
+    }
+
+    #[tool(description = "Return the active debuggee's general-purpose registers and flags.")]
+    fn x64dbg_get_registers(&self) -> Result<String, String> {
+        plugin_call("get_registers", json!({}))
+    }
+
+    #[tool(description = "Read 1 to 64 pointer-sized values from the active debuggee's stack.")]
+    fn x64dbg_get_stack(
+        &self,
+        Parameters(params): Parameters<StackParams>,
+    ) -> Result<String, String> {
+        plugin_call("get_stack", json!({ "count": params.count.unwrap_or(16) }))
+    }
+
+    #[tool(description = "List breakpoints in the active x64dbg session.")]
+    fn x64dbg_list_breakpoints(&self) -> Result<String, String> {
+        plugin_call("list_breakpoints", json!({}))
+    }
+
+    #[tool(description = "Set a software breakpoint at an address or x64dbg expression.")]
+    fn x64dbg_set_breakpoint(
+        &self,
+        Parameters(params): Parameters<AddressParams>,
+    ) -> Result<String, String> {
+        plugin_call("set_breakpoint", json!({ "address": params.address }))
+    }
+
+    #[tool(description = "Remove a software breakpoint at an address or x64dbg expression.")]
+    fn x64dbg_remove_breakpoint(
+        &self,
+        Parameters(params): Parameters<AddressParams>,
+    ) -> Result<String, String> {
+        plugin_call("remove_breakpoint", json!({ "address": params.address }))
+    }
+
+    #[tool(
+        description = "Write 1 to 4096 bytes to the active debuggee's memory. This changes target memory."
+    )]
+    fn x64dbg_write_memory(
+        &self,
+        Parameters(params): Parameters<WriteMemoryParams>,
+    ) -> Result<String, String> {
+        plugin_call(
+            "write_memory",
+            json!({ "address": params.address, "bytes": params.bytes }),
         )
     }
 

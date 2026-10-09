@@ -24,17 +24,23 @@ mod plugin {
 
     type Eval = unsafe extern "C" fn(*const c_char, *mut bool) -> usize;
     type MemRead = unsafe extern "C" fn(usize, *mut c_void, usize) -> bool;
+    type MemWrite = unsafe extern "C" fn(usize, *const c_void, usize) -> bool;
     type DisasmAt = unsafe extern "C" fn(usize, *mut DisasmInstr);
     type Command = unsafe extern "C" fn(*const c_char) -> bool;
     type DebugState = unsafe extern "C" fn() -> bool;
+    type BpList = unsafe extern "C" fn(c_int, *mut BpMap) -> c_int;
+    type BridgeFree = unsafe extern "C" fn(*mut c_void);
 
     struct BridgeApi {
         eval: Eval,
         mem_read: MemRead,
+        mem_write: MemWrite,
         disasm_at: DisasmAt,
         command: Command,
         is_debugging: DebugState,
         is_running: DebugState,
+        bp_list: BpList,
+        bridge_free: BridgeFree,
     }
 
     #[repr(C)]
@@ -54,6 +60,35 @@ mod plugin {
         arg_count: c_int,
         instruction_size: c_int,
         args: [DisasmArg; 3],
+    }
+
+    #[repr(C)]
+    struct BridgeBp {
+        kind: c_int,
+        address: usize,
+        enabled: bool,
+        singleshoot: bool,
+        active: bool,
+        name: [c_char; 256],
+        module: [c_char; 256],
+        slot: u16,
+        type_ex: u8,
+        hw_size: u8,
+        hit_count: u32,
+        fast_resume: bool,
+        silent: bool,
+        break_condition: [c_char; 256],
+        log_text: [c_char; 256],
+        log_condition: [c_char; 256],
+        command_text: [c_char; 256],
+        command_condition: [c_char; 256],
+    }
+
+    #[repr(C)]
+    #[derive(Default)]
+    struct BpMap {
+        count: c_int,
+        bp: *mut BridgeBp,
     }
 
     #[repr(C)]
@@ -95,10 +130,13 @@ mod plugin {
         Ok(BridgeApi {
             eval: unsafe { bridge_fn(module, b"DbgEval\0")? },
             mem_read: unsafe { bridge_fn(module, b"DbgMemRead\0")? },
+            mem_write: unsafe { bridge_fn(module, b"DbgMemWrite\0")? },
             disasm_at: unsafe { bridge_fn(module, b"DbgDisasmAt\0")? },
             command: unsafe { bridge_fn(module, b"DbgCmdExecDirect\0")? },
             is_debugging: unsafe { bridge_fn(module, b"DbgIsDebugging\0")? },
             is_running: unsafe { bridge_fn(module, b"DbgIsRunning\0")? },
+            bp_list: unsafe { bridge_fn(module, b"DbgGetBpList\0")? },
+            bridge_free: unsafe { bridge_fn(module, b"BridgeFree\0")? },
         })
     }
 
@@ -126,6 +164,33 @@ mod plugin {
         success
             .then_some(value)
             .ok_or_else(|| "x64dbg could not evaluate the expression".to_owned())
+    }
+
+    fn c_text(value: &[c_char]) -> String {
+        let end = value
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(value.len());
+        String::from_utf8_lossy(
+            &value[..end]
+                .iter()
+                .map(|&byte| byte as u8)
+                .collect::<Vec<_>>(),
+        )
+        .into_owned()
+    }
+
+    fn stack_addresses(start: usize, count: u64) -> Result<Vec<usize>, String> {
+        if !(1..=64).contains(&count) {
+            return Err("count must be between 1 and 64".to_owned());
+        }
+        (0..count)
+            .map(|index| {
+                start
+                    .checked_add(index as usize * std::mem::size_of::<usize>())
+                    .ok_or_else(|| "stack address overflow".to_owned())
+            })
+            .collect()
     }
 
     fn dispatch(request: &Value) -> Result<Value, String> {
@@ -201,6 +266,139 @@ mod plugin {
                     .collect::<String>();
                 Ok(json!({ "address": format!("0x{address:X}"), "length": length, "bytes": hex }))
             }
+            "get_registers" => {
+                if !unsafe { (api.is_debugging)() } {
+                    return Err("x64dbg has no active debuggee".to_owned());
+                }
+                let names: &[&str] = if usize::BITS == 64 {
+                    &[
+                        "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp", "rip", "r8", "r9",
+                        "r10", "r11", "r12", "r13", "r14", "r15", "eflags", "cs", "ss", "ds", "es",
+                        "fs", "gs",
+                    ]
+                } else {
+                    &[
+                        "eax", "ebx", "ecx", "edx", "esi", "edi", "ebp", "esp", "eip", "eflags",
+                        "cs", "ss", "ds", "es", "fs", "gs",
+                    ]
+                };
+                let mut registers = serde_json::Map::new();
+                for &name in names {
+                    if let Ok(value) = evaluate(api, name) {
+                        registers.insert(name.to_owned(), json!(format!("0x{value:X}")));
+                    }
+                }
+                if registers.is_empty() {
+                    return Err("x64dbg could not read the register context".to_owned());
+                }
+                Ok(json!({
+                    "architecture": if usize::BITS == 64 { "x64" } else { "x86" },
+                    "registers": registers
+                }))
+            }
+            "get_stack" => {
+                if !unsafe { (api.is_debugging)() } {
+                    return Err("x64dbg has no active debuggee".to_owned());
+                }
+                let count = params.get("count").and_then(Value::as_u64).unwrap_or(16);
+                let start = evaluate(api, "csp")?;
+                let addresses = stack_addresses(start, count)?;
+                let mut bytes = vec![0; addresses.len() * std::mem::size_of::<usize>()];
+                if !unsafe { (api.mem_read)(start, bytes.as_mut_ptr().cast(), bytes.len()) } {
+                    return Err(format!("x64dbg could not read stack memory at 0x{start:X}"));
+                }
+                let values = bytes
+                    .chunks_exact(std::mem::size_of::<usize>())
+                    .zip(addresses)
+                    .map(|(chunk, address)| {
+                        let value = usize::from_le_bytes(chunk.try_into().unwrap());
+                        json!({ "address": format!("0x{address:X}"), "value": format!("0x{value:X}") })
+                    })
+                    .collect::<Vec<_>>();
+                Ok(json!({ "stack_pointer": format!("0x{start:X}"), "values": values }))
+            }
+            "list_breakpoints" => {
+                if !unsafe { (api.is_debugging)() } {
+                    return Err("x64dbg has no active debuggee".to_owned());
+                }
+                let mut map = BpMap::default();
+                let count = unsafe { (api.bp_list)(0, &mut map) };
+                if map.bp.is_null() {
+                    if count == 0 && map.count == 0 {
+                        return Ok(json!({ "breakpoints": [] }));
+                    }
+                    return Err("x64dbg returned an invalid breakpoint list".to_owned());
+                }
+                let result = if !(0..=4096).contains(&count) || map.count != count {
+                    Err("x64dbg returned an invalid or oversized breakpoint list".to_owned())
+                } else {
+                    let breakpoints = unsafe { std::slice::from_raw_parts(map.bp, count as usize) }
+                        .iter()
+                        .map(|bp| {
+                            json!({
+                                "address": format!("0x{:X}", bp.address),
+                                "type": match bp.kind { 1 => "software", 2 => "hardware", 4 => "memory", 8 => "dll", 16 => "exception", _ => "unknown" },
+                                "enabled": bp.enabled,
+                                "active": bp.active,
+                                "hits": bp.hit_count,
+                                "name": c_text(&bp.name),
+                                "module": c_text(&bp.module)
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    Ok(json!({ "breakpoints": breakpoints }))
+                };
+                unsafe { (api.bridge_free)(map.bp.cast()) };
+                result
+            }
+            "set_breakpoint" | "remove_breakpoint" => {
+                if !unsafe { (api.is_debugging)() } {
+                    return Err("x64dbg has no active debuggee".to_owned());
+                }
+                let address = evaluate(api, text_param(params, "address", 256)?)?;
+                let command = if method == "set_breakpoint" {
+                    "bp"
+                } else {
+                    "bc"
+                };
+                let command = CString::new(format!("{command} 0x{address:X}")).unwrap();
+                let success = unsafe { (api.command)(command.as_ptr()) };
+                if !success {
+                    return Err(format!("x64dbg could not {method} at 0x{address:X}"));
+                }
+                Ok(json!({ "success": success, "address": format!("0x{address:X}") }))
+            }
+            "write_memory" => {
+                if !unsafe { (api.is_debugging)() } {
+                    return Err("x64dbg has no active debuggee".to_owned());
+                }
+                let address = evaluate(api, text_param(params, "address", 256)?)?;
+                let bytes = params
+                    .get("bytes")
+                    .and_then(Value::as_array)
+                    .ok_or_else(|| "'bytes' must be an array of integers".to_owned())?;
+                if !(1..=4096).contains(&bytes.len()) {
+                    return Err("bytes must contain between 1 and 4096 values".to_owned());
+                }
+                let bytes = bytes
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_u64()
+                            .filter(|&byte| byte <= u8::MAX as u64)
+                            .map(|byte| byte as u8)
+                            .ok_or_else(|| {
+                                "each byte must be an integer from 0 through 255".to_owned()
+                            })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                if !unsafe { (api.mem_write)(address, bytes.as_ptr().cast(), bytes.len()) } {
+                    return Err(format!("x64dbg could not write memory at 0x{address:X}"));
+                }
+                Ok(
+                    json!({ "address": format!("0x{address:X}"), "length": bytes.len(), "success": true }),
+                )
+            }
             "execute_command" => {
                 let command = text_param(params, "command", 4096)?;
                 let command_c =
@@ -209,6 +407,32 @@ mod plugin {
                 Ok(json!({ "success": succeeded }))
             }
             _ => Err(format!("unknown x64dbg method '{method}'")),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::stack_addresses;
+
+        #[test]
+        fn stack_addresses_are_pointer_sized_and_bounded() {
+            assert_eq!(
+                stack_addresses(0x1000, 3).unwrap(),
+                vec![
+                    0x1000,
+                    0x1000 + std::mem::size_of::<usize>(),
+                    0x1000 + 2 * std::mem::size_of::<usize>()
+                ]
+            );
+            assert!(stack_addresses(0, 0).is_err());
+            assert!(stack_addresses(0, 65).is_err());
+            assert!(stack_addresses(usize::MAX, 2).is_err());
+        }
+
+        #[test]
+        fn breakpoint_layout_matches_x64dbg_bridge_abi() {
+            let expected_size = if usize::BITS == 64 { 1824 } else { 1816 };
+            assert_eq!(std::mem::size_of::<super::BridgeBp>(), expected_size);
         }
     }
 
@@ -273,7 +497,10 @@ mod plugin {
             return false;
         }
         let expected_size = if usize::BITS == 64 { 368 } else { 328 };
-        if std::mem::size_of::<DisasmInstr>() != expected_size {
+        let expected_bp_size = if usize::BITS == 64 { 1824 } else { 1816 };
+        if std::mem::size_of::<DisasmInstr>() != expected_size
+            || std::mem::size_of::<BridgeBp>() != expected_bp_size
+        {
             return false;
         }
         RUNNING.store(true, Ordering::Release);
