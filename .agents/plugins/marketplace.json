@@ -1,0 +1,15 @@
+{
+  "name": "zxcvbbq",
+  "interface": {
+    "displayName": "x64dbg MCP Marketplace"
+  },
+  "plugins": [
+    {
+      "name": "x64dbg-mcp",
+      "source": {
+        "source": "local",
+        "path": "./"
+      }
+    }
+  ]
+}

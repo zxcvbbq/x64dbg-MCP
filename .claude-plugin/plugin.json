@@ -1,0 +1,25 @@
+{
+  "name": "x64dbg-mcp",
+  "displayName": "x64dbg MCP",
+  "version": "0.1.0",
+  "description": "Connect Claude Code to a running x64dbg debugger.",
+  "author": {
+    "name": "zxcvbbq"
+  },
+  "repository": "https://github.com/zxcvbbq/x64dbg-MCP",
+  "license": "MIT",
+  "keywords": ["x64dbg", "debugger", "reverse-engineering", "mcp"],
+  "mcpServers": {
+    "x64dbg": {
+      "command": "cargo",
+      "args": [
+        "run",
+        "--quiet",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "${CLAUDE_PLUGIN_ROOT}/Cargo.toml"
+      ]
+    }
+  }
+}

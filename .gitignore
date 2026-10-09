@@ -1,0 +1,4 @@
+/x64dbg/
+/target/
+*.dp32
+*.dp64

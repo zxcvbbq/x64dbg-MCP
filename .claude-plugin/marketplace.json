@@ -1,0 +1,22 @@
+{
+  "name": "zxcvbbq",
+  "owner": {
+    "name": "zxcvbbq"
+  },
+  "metadata": {
+    "description": "Claude Code marketplace for the x64dbg MCP server."
+  },
+  "plugins": [
+    {
+      "name": "x64dbg-mcp",
+      "source": "./",
+      "description": "MCP tools for inspecting and controlling a local x64dbg session.",
+      "version": "0.1.0",
+      "author": {
+        "name": "zxcvbbq"
+      },
+      "category": "Developer Tools",
+      "tags": ["x64dbg", "debugging", "reverse-engineering", "mcp"]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "x64dbg-mcp",
+  "version": "0.1.0",
+  "description": "MCP tools for inspecting and controlling a local x64dbg session.",
+  "author": {
+    "name": "zxcvbbq"
+  },
+  "license": "MIT",
+  "keywords": ["x64dbg", "debugging", "reverse-engineering", "mcp"],
+  "interface": {
+    "displayName": "x64dbg MCP",
+    "shortDescription": "Connect Codex to a running x64dbg session.",
+    "longDescription": "Evaluate expressions, disassemble code, read target memory, inspect debugger state, and execute x64dbg commands.",
+    "developerName": "zxcvbbq",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "MCP"]
+  },
+  "mcpServers": "./.codex-plugin/mcp.json"
+}

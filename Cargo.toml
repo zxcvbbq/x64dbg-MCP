@@ -1,0 +1,25 @@
+[package]
+name = "x64dbg-mcp"
+version = "0.1.0"
+edition = "2024"
+description = "A Rust MCP bridge for x64dbg"
+license = "MIT"
+
+[lib]
+name = "x64dbg_plugin"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "x64dbg-mcp"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+rmcp = { version = "3.2.0", features = ["server", "macros", "transport-io"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
