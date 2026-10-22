@@ -1,7 +1,7 @@
 {
-  "name": "x64dbg-mcp",
+  "name": "zxcvbbq-x64dbg-MCP",
   "interface": {
-    "displayName": "x64dbg MCP"
+    "displayName": "x64dbg MCP Marketplace"
   },
   "plugins": [
     {
