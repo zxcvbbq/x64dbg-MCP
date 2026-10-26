@@ -10,7 +10,7 @@ For Claude Code:
 
 ```powershell
 claude plugin marketplace add zxcvbbq/x64dbg-MCP
-claude plugin install x64dbg-mcp@zxcvbbq
+claude plugin install x64dbg-mcp@x64dbg-mcp
 ```
 
 For Codex:
